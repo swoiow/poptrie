@@ -1,0 +1,23 @@
+[package]
+name = "poptrie"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "poptrie"
+crate-type = ["cdylib"]
+
+[dependencies]
+memmap2 = "0.9.9"
+rayon = "1.11.0"
+
+[dependencies.pyo3]
+version = "0.27.2"
+features = ["extension-module", "abi3-py38"]
+
+[profile.release]
+opt-level = 3         # 确保开启最高等级优化
+lto = "fat"           # 开启全模块链接优化，消除跨 crate 的性能开销
+codegen-units = 1     # 牺牲编译速度换取更好的机器码生成
+panic = "abort"       # 减小二进制体积，并略微提升性能（不再需要展开堆栈）
+strip = "symbols"     # 自动移除调试符号，减小库文件体积
