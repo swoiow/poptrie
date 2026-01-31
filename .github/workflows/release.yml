@@ -50,6 +50,10 @@ jobs:
         python-version:
           - "3.13"
 
+    env:
+      PYTHONIOENCODING: "utf-8"
+      PYTHONUTF8: "1"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4

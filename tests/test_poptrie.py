@@ -55,11 +55,7 @@ class TestPopTrie(unittest.TestCase):
 
     def test_batch_check(self):
         ips = ["1.0.1.1", "8.8.8.8", "240e::1", "2001:db8::"]
-        ip_bytes_list = [
-            socket.inet_pton(socket.AF_INET6 if ':' in ip else socket.AF_INET, ip)
-            for ip in ips
-        ]
-        results = self.searcher.batch_check(ip_bytes_list)
+        results = self.searcher.batch_check_strings(ips)
         self.assertEqual(results, [True, False, True, False])
 
     def test_batch_check_packed(self):

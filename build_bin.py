@@ -3,7 +3,7 @@ import struct
 
 
 class BinBuilder:
-    NODE_SIZE = 68  # 32字节Child_BM + 32字节Leaf_BM + 4字节Base_Offset
+    NODE_SIZE = 72  # 32字节Child_BM + 32字节Leaf_BM + 4字节Base_Offset + 4字节Padding
 
     def __init__(self):
         # 根节点：{ 'children': {byte: node_dict}, 'is_leaf': bool }
@@ -111,12 +111,12 @@ class BinBuilder:
 
                 if nodes_with_children:
                     # 记录跳转到下一层这些子节点的起始偏移
-                    final_data.extend(struct.pack("<I", next_layer_start_offset))
+                    final_data.extend(struct.pack("<II", next_layer_start_offset, 0))
                     next_layer.extend(nodes_with_children)
                     next_layer_start_offset += len(nodes_with_children) * self.NODE_SIZE
                 else:
                     # 没有子节点可跳转
-                    final_data.extend(struct.pack("<I", 0))
+                    final_data.extend(struct.pack("<II", 0, 0))
 
             current_layer = next_layer
 
