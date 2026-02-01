@@ -68,15 +68,38 @@ def main() -> None:
 
         wheel.unlink()
         subprocess.run(
-            [sys.executable, "setup.py", "bdist_wheel"],
+            [sys.executable, "setup.py", "bdist_wheel", "--py-limited-api=cp38"],
             cwd=temp_dir,
             check=True,
         )
         built_wheels = sorted((temp_dir / "dist").glob("*.whl"))
         if not built_wheels:
             raise SystemExit("bdist_wheel did not produce a wheel")
-        for built_wheel in built_wheels:
-            shutil.copy2(built_wheel, dist_dir / built_wheel.name)
+        if sys.platform.startswith("linux"):
+            wheelhouse = temp_dir / "wheelhouse"
+            wheelhouse.mkdir(exist_ok=True)
+            for built_wheel in built_wheels:
+                subprocess.run(
+                    [
+                        sys.executable,
+                        "-m",
+                        "auditwheel",
+                        "repair",
+                        str(built_wheel),
+                        "-w",
+                        str(wheelhouse),
+                    ],
+                    cwd=temp_dir,
+                    check=True,
+                )
+            repaired = sorted(wheelhouse.glob("*.whl"))
+            if not repaired:
+                raise SystemExit("auditwheel did not produce a wheel")
+            for built_wheel in repaired:
+                shutil.copy2(built_wheel, dist_dir / built_wheel.name)
+        else:
+            for built_wheel in built_wheels:
+                shutil.copy2(built_wheel, dist_dir / built_wheel.name)
         shutil.rmtree(temp_dir)
 
 

@@ -1,15 +1,15 @@
-from setuptools import find_packages, setup
-from setuptools.dist import Distribution
+from setuptools import Distribution, find_packages, setup
 
 
 class BinaryDistribution(Distribution):
-    def has_ext_modules(self) -> bool:
+    def has_ext_modules(self):
         return True
 
 
 setup(
     name="poptrie",
     version="__VERSION__",
+    distclass=BinaryDistribution,
     description="Fast IP lookup using poptrie",
     author="HarmonSir",
     author_email="git@pylab.me",
@@ -19,5 +19,4 @@ setup(
     package_data={
         "poptrie": ["*.so", "*.pyd", "*.dll", "*.dylib"],
     },
-    distclass=BinaryDistribution,
 )

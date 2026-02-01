@@ -87,6 +87,10 @@ jobs:
       - name: Install maturin
         run: $PYTHON_EXEC -m pip install --upgrade pip maturin setuptools wheel
 
+      - name: Install auditwheel (Linux)
+        if: runner.os == 'Linux'
+        run: $PYTHON_EXEC -m pip install --upgrade auditwheel
+
       - name: Build wheels
         run: $PYTHON_EXEC -m maturin build --release --out dist
 
