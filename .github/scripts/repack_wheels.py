@@ -1,3 +1,7 @@
+"""
+if you want to repack with details, please check the git log, before “less code repack, make it simple.”
+"""
+
 import shutil
 import subprocess
 import sys
@@ -18,16 +22,6 @@ def _load_setup_template(template_path: Path, version: str) -> str:
     if "__VERSION__" not in template:
         raise SystemExit("setup.py template missing __VERSION__ placeholder")
     return template.replace("__VERSION__", version)
-
-
-def _parse_wheel_tags(filename: str) -> tuple[str, str, str]:
-    name = filename
-    if name.endswith(".whl"):
-        name = name[:-4]
-    parts = name.split("-")
-    if len(parts) < 5:
-        raise SystemExit(f"Invalid wheel filename: {filename}")
-    return parts[-3], parts[-2], parts[-1]
 
 
 def main() -> None:
@@ -61,7 +55,6 @@ def main() -> None:
         package_dir = temp_dir / "poptrie"
         if not package_dir.exists():
             raise SystemExit(f"poptrie package not found in {wheel.name}")
-
         suffixes = (".so", ".pyd", ".dll", ".dylib")
         for ext_file in temp_dir.iterdir():
             if ext_file.is_file() and ext_file.name.startswith("poptrie") and ext_file.suffix in suffixes:
@@ -74,19 +67,8 @@ def main() -> None:
         (temp_dir / "setup.py").write_text(setup_py, encoding="utf-8")
 
         wheel.unlink()
-        python_tag, abi_tag, plat_tag = _parse_wheel_tags(wheel.name)
         subprocess.run(
-            [
-                sys.executable,
-                "setup.py",
-                "bdist_wheel",
-                "--python-tag",
-                python_tag,
-                "--abi-tag",
-                abi_tag,
-                "--plat-name",
-                plat_tag,
-            ],
+            [sys.executable, "setup.py", "bdist_wheel"],
             cwd=temp_dir,
             check=True,
         )
