@@ -24,7 +24,7 @@ impl IpSearcher {
     }
 
     /// 核心查询逻辑：支持 IPv4 (4字节) 和 IPv6 (16字节)
-    fn is_china_ip(&self, ip_bytes: &[u8]) -> bool {
+    fn is_matched_ip(&self, ip_bytes: &[u8]) -> bool {
         let mut cursor: usize = 0;
 
         for &byte in ip_bytes {
@@ -63,7 +63,7 @@ impl IpSearcher {
         // 这是极致性能的关键：内存完全连续，没有 Python 对象开销
         packed_ips
             .chunks_exact(ip_stride)
-            .map(|ip_chunk| self.is_china_ip(ip_chunk))
+            .map(|ip_chunk| self.is_matched_ip(ip_chunk))
             .collect()
     }
 
@@ -71,8 +71,8 @@ impl IpSearcher {
         py.allow_threads(|| {
             ips.into_par_iter()
                 .map(|ip_str| match ip_str.parse::<IpAddr>() {
-                    Ok(IpAddr::V4(v4)) => self.is_china_ip(&v4.octets()),
-                    Ok(IpAddr::V6(v6)) => self.is_china_ip(&v6.octets()),
+                    Ok(IpAddr::V4(v4)) => self.is_matched_ip(&v4.octets()),
+                    Ok(IpAddr::V6(v6)) => self.is_matched_ip(&v6.octets()),
                     Err(_) => false,
                 })
                 .collect()

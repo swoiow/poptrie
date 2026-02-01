@@ -30,28 +30,28 @@ class TestPopTrie(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        if hasattr(cls, 'searcher'):
+        if hasattr(cls, "searcher"):
             del cls.searcher  # 释放 mmap
         if os.path.exists(cls.BIN_PATH):
             os.remove(cls.BIN_PATH)
 
     def test_ipv4_basic(self):
         # 命中测试
-        self.assertTrue(self.searcher.is_china_ip(socket.inet_pton(socket.AF_INET, "1.0.1.1")))
-        self.assertTrue(self.searcher.is_china_ip(socket.inet_pton(socket.AF_INET, "110.16.255.255")))
+        self.assertTrue(self.searcher.is_matched_ip(socket.inet_pton(socket.AF_INET, "1.0.1.1")))
+        self.assertTrue(self.searcher.is_matched_ip(socket.inet_pton(socket.AF_INET, "110.16.255.255")))
         # 未命中测试
-        self.assertFalse(self.searcher.is_china_ip(socket.inet_pton(socket.AF_INET, "8.8.8.8")))
-        self.assertFalse(self.searcher.is_china_ip(socket.inet_pton(socket.AF_INET, "192.168.2.1")))
+        self.assertFalse(self.searcher.is_matched_ip(socket.inet_pton(socket.AF_INET, "8.8.8.8")))
+        self.assertFalse(self.searcher.is_matched_ip(socket.inet_pton(socket.AF_INET, "192.168.2.1")))
 
     def test_ipv6_boundary(self):
         # 240e::/18 范围：240e:0000:: 到 240e:3fff:ffff...
-        self.assertTrue(self.searcher.is_china_ip(socket.inet_pton(socket.AF_INET6, "240e::")))
-        self.assertTrue(self.searcher.is_china_ip(socket.inet_pton(socket.AF_INET6, "240e::2")))
-        self.assertTrue(self.searcher.is_china_ip(socket.inet_pton(socket.AF_INET6, "240e:3fff:ffff:ffff::1")))
+        self.assertTrue(self.searcher.is_matched_ip(socket.inet_pton(socket.AF_INET6, "240e::")))
+        self.assertTrue(self.searcher.is_matched_ip(socket.inet_pton(socket.AF_INET6, "240e::2")))
+        self.assertTrue(self.searcher.is_matched_ip(socket.inet_pton(socket.AF_INET6, "240e:3fff:ffff:ffff::1")))
 
         # 边界外
-        self.assertFalse(self.searcher.is_china_ip(socket.inet_pton(socket.AF_INET6, "240e:4000::")))
-        self.assertFalse(self.searcher.is_china_ip(socket.inet_pton(socket.AF_INET6, "2001:4860:4860::8888")))
+        self.assertFalse(self.searcher.is_matched_ip(socket.inet_pton(socket.AF_INET6, "240e:4000::")))
+        self.assertFalse(self.searcher.is_matched_ip(socket.inet_pton(socket.AF_INET6, "2001:4860:4860::8888")))
 
     def test_batch_check(self):
         ips = ["1.0.1.1", "8.8.8.8", "240e::1", "2001:db8::"]
@@ -66,5 +66,5 @@ class TestPopTrie(unittest.TestCase):
         self.assertEqual(results, [True, False, True, False])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

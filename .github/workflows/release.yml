@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 defaults:
   run:
     shell: bash
@@ -56,10 +60,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -81,15 +85,21 @@ jobs:
           echo "PYTHON_EXEC=$(pwd)/.venv/Scripts/python.exe" >> $GITHUB_ENV
 
       - name: Install maturin
-        run: $PYTHON_EXEC -m pip install --upgrade pip maturin
+        run: $PYTHON_EXEC -m pip install --upgrade pip maturin setuptools wheel
 
       - name: Build wheels
         run: $PYTHON_EXEC -m maturin build --release --out dist
+
+      - name: Repack wheels
+        run: |
+          $PYTHON_EXEC .github/scripts/repack_wheels.py
 
       - name: Install wheel
         run: $PYTHON_EXEC -m pip install dist/*.whl
 
       - name: Run Tests
+        env:
+          POPTRIE_TEST_GEOIP_URL: "https://github.com/Loyalsoldier/geoip/raw/refs/heads/release/text/cn.txt"
         run: |
           $PYTHON_EXEC -m unittest discover tests
 
@@ -106,6 +116,22 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Create venv
+        run: |
+          python -m venv .venv
+          echo "PYTHON_EXEC=$PWD/.venv/bin/python" >> $GITHUB_ENV
+
+      - name: Install build deps
+        run: $PYTHON_EXEC -m pip install --upgrade pip
+
       - name: Cleanup latest release assets
         uses: actions/github-script@v7
         with:
@@ -129,12 +155,44 @@ jobs:
                 throw error;
               }
             }
+      - name: Remove latest release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              const release = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: "latest",
+              });
+              await github.rest.repos.deleteRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.data.id,
+              });
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: "tags/latest",
+              });
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+            }
 
       - name: Download wheels
         uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
+
+      - name: Build CN bin
+        run: |
+          export PYTHONPATH="$GITHUB_WORKSPACE"
+          $PYTHON_EXEC .github/scripts/build_cn_bin.py \
+            --url "https://github.com/Loyalsoldier/geoip/raw/refs/heads/release/text/cn.txt" \
+            --output dist/china-ip.bin
 
       - name: Publish latest release
         uses: softprops/action-gh-release@v2

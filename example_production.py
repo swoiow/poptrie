@@ -24,14 +24,14 @@ class IpSearcher:
         """
         self._searcher = poptrie.IpSearcher(str(bin_path))
 
-    def is_china_ip(self, ip_bytes: bytes) -> bool:
+    def is_matched_ip(self, ip_bytes: bytes) -> bool:
         """Check a single IPv4/IPv6 address in packed bytes.
         查询单个 IP（IPv4/IPv6）对应的 bytes。
 
         :param ip_bytes: 4-byte IPv4 or 16-byte IPv6.
         :return: True if matched, otherwise False.
         """
-        return self._searcher.is_china_ip(ip_bytes)
+        return self._searcher.is_matched_ip(ip_bytes)
 
     def batch_check_strings(self, ips: Iterable[str]) -> list[bool]:
         """Check a list of IP strings, preserving input order.
@@ -68,7 +68,7 @@ class IpSearcher:
         :param ips: IP strings (IPv4 or IPv6).
         :return: Match results aligned to input order.
         """
-        return self.batch_check_strings(list(ips))
+        return self._searcher.batch_check_strings(list(ips))
 
     def check_packed(self, packed_ips: bytes, is_v6: bool) -> list[bool]:
         """Check a packed byte buffer (alias of batch_check_packed).
@@ -131,7 +131,7 @@ def main() -> None:
     searcher = IpSearcher(bin_path)
 
     ip_bytes = socket.inet_pton(socket.AF_INET, "1.0.1.1")
-    print(searcher.is_china_ip(ip_bytes))
+    print(searcher.is_matched_ip(ip_bytes))
 
     ips = ["1.0.1.1", "8.8.8.8", "240e::1", "2001:db8::"]
     print(searcher.check_ips(ips))

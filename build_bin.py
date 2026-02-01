@@ -125,11 +125,12 @@ class BinBuilder:
         print(f"构建完成！压缩后大小: {len(final_data) / 1024:.2f} KB")
 
 
-# --- 使用方式 ---
-builder = BinBuilder()
-# 这里放入你收集的中国 IP CIDR 列表
-china_cidrs = ["1.0.1.0/24", "110.16.0.0/12", "240e::/18"]
-for c in china_cidrs:
-    builder.add_cidr(c)
+if __name__ == '__main__':
+    # --- 使用方式 ---
+    builder = BinBuilder()
+    # 这里放入你收集的中国 IP CIDR 列表
+    china_cidrs = ["1.0.1.0/24", "110.16.0.0/12", "240e::/18"]
+    for c in china_cidrs:
+        builder.add_cidr(c)
 
-builder.save("china_ip.bin")
+    builder.save("china_ip.bin")
