@@ -7,6 +7,9 @@ use std::net::IpAddr;
 #[pyclass]
 struct IpSearcher {
     mmap: Mmap,
+    nodes_start: usize,
+    values_start: usize,
+    values_count: usize,
 }
 
 #[pymethods]
@@ -15,17 +18,48 @@ impl IpSearcher {
     fn new(path: String) -> PyResult<Self> {
         let file = File::open(path)?;
         let mmap = unsafe { Mmap::map(&file)? };
-        if mmap.len() % Self::NODE_SIZE != 0 {
+        let mut nodes_start = 0;
+        let mut values_start = mmap.len();
+        let mut values_count = 0;
+
+        if mmap.len() >= Self::HEADER_SIZE && &mmap[0..4] == Self::MAGIC {
+            let node_count = u32::from_le_bytes(mmap[4..8].try_into().unwrap()) as usize;
+            values_count = u32::from_le_bytes(mmap[8..12].try_into().unwrap()) as usize;
+            let nodes_bytes = node_count.checked_mul(Self::NODE_SIZE).ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "Invalid bin file: node count overflow.",
+                )
+            })?;
+            let values_bytes = values_count.checked_mul(2).ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "Invalid bin file: values count overflow.",
+                )
+            })?;
+            let expected_len = Self::HEADER_SIZE + nodes_bytes + values_bytes;
+            if mmap.len() != expected_len {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "Invalid bin file: size mismatch.",
+                ));
+            }
+            nodes_start = Self::HEADER_SIZE;
+            values_start = Self::HEADER_SIZE + nodes_bytes;
+        } else if mmap.len() % Self::NODE_SIZE != 0 {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                 "Invalid bin file: alignment mismatch (expected 72).",
             ));
         }
-        Ok(IpSearcher { mmap })
+
+        Ok(IpSearcher {
+            mmap,
+            nodes_start,
+            values_start,
+            values_count,
+        })
     }
 
     /// 核心查询逻辑：支持 IPv4 (4字节) 和 IPv6 (16字节)
-    fn is_matched_ip(&self, ip_bytes: &[u8]) -> bool {
-        let mut cursor: usize = 0;
+    fn contains_ip(&self, ip_bytes: &[u8]) -> bool {
+        let mut cursor: usize = self.nodes_start;
 
         for &byte in ip_bytes {
             // 节点布局: 0-31 ChildBitmap, 32-63 LeafBitmap, 64-67 BaseOffset
@@ -55,25 +89,80 @@ impl IpSearcher {
         false
     }
 
-    /// 极致性能版：接收扁平化字节流（每 4 或 16 字节代表一个 IP）
-    fn batch_check_packed(&self, packed_ips: &[u8], is_v6: bool) -> Vec<bool> {
+    /// 返回国家代码 (u16)，未命中返回 0
+    fn lookup_code(&self, ip_bytes: &[u8]) -> u16 {
+        let mut cursor: usize = self.nodes_start;
+
+        for &byte in ip_bytes {
+            let child_bitmap = &self.mmap[cursor..cursor + 32];
+            let leaf_bitmap = &self.mmap[cursor + 32..cursor + 64];
+
+            if self.check_bit(leaf_bitmap, byte) {
+                if self.values_count == 0 {
+                    return 0;
+                }
+                let base_index =
+                    u32::from_le_bytes(self.mmap[cursor + 68..cursor + 72].try_into().unwrap())
+                        as usize;
+                let offset = self.get_popcount(leaf_bitmap, byte);
+                let value_index = base_index + offset;
+                if value_index >= self.values_count {
+                    return 0;
+                }
+                let value_pos = self.values_start + (value_index * 2);
+                return u16::from_le_bytes(self.mmap[value_pos..value_pos + 2].try_into().unwrap());
+            }
+
+            if !self.check_bit(child_bitmap, byte) {
+                return 0;
+            }
+
+            let base_offset =
+                u32::from_le_bytes(self.mmap[cursor + 64..cursor + 68].try_into().unwrap())
+                    as usize;
+            let index = self.get_popcount(child_bitmap, byte);
+            cursor = base_offset + (index * Self::NODE_SIZE);
+        }
+        0
+    }
+
+    fn contains_packed(&self, packed_ips: &[u8], is_v6: bool) -> Vec<bool> {
         let ip_stride = if is_v6 { 16 } else { 4 };
 
-        // 使用 chunks_exact 确保每次切出固定长度的 IP 字节块
-        // 这是极致性能的关键：内存完全连续，没有 Python 对象开销
         packed_ips
             .chunks_exact(ip_stride)
-            .map(|ip_chunk| self.is_matched_ip(ip_chunk))
+            .map(|ip_chunk| self.contains_ip(ip_chunk))
             .collect()
     }
 
-    fn batch_check_strings(&self, py: Python<'_>, ips: Vec<String>) -> Vec<bool> {
-        py.allow_threads(|| {
+    fn contains_strings(&self, py: Python<'_>, ips: Vec<String>) -> Vec<bool> {
+        py.detach(|| {
             ips.into_par_iter()
                 .map(|ip_str| match ip_str.parse::<IpAddr>() {
-                    Ok(IpAddr::V4(v4)) => self.is_matched_ip(&v4.octets()),
-                    Ok(IpAddr::V6(v6)) => self.is_matched_ip(&v6.octets()),
+                    Ok(IpAddr::V4(v4)) => self.contains_ip(&v4.octets()),
+                    Ok(IpAddr::V6(v6)) => self.contains_ip(&v6.octets()),
                     Err(_) => false,
+                })
+                .collect()
+        })
+    }
+
+    fn lookup_codes_packed(&self, packed_ips: &[u8], is_v6: bool) -> Vec<u16> {
+        let ip_stride = if is_v6 { 16 } else { 4 };
+
+        packed_ips
+            .chunks_exact(ip_stride)
+            .map(|ip_chunk| self.lookup_code(ip_chunk))
+            .collect()
+    }
+
+    fn lookup_codes_strings(&self, py: Python<'_>, ips: Vec<String>) -> Vec<u16> {
+        py.detach(|| {
+            ips.into_par_iter()
+                .map(|ip_str| match ip_str.parse::<IpAddr>() {
+                    Ok(IpAddr::V4(v4)) => self.lookup_code(&v4.octets()),
+                    Ok(IpAddr::V6(v6)) => self.lookup_code(&v6.octets()),
+                    Err(_) => 0,
                 })
                 .collect()
         })
@@ -82,6 +171,8 @@ impl IpSearcher {
 
 impl IpSearcher {
     const NODE_SIZE: usize = 72;
+    const HEADER_SIZE: usize = 16;
+    const MAGIC: &'static [u8; 4] = b"PTV2";
 
     #[inline]
     fn check_bit(&self, bitmap: &[u8], byte: u8) -> bool {
@@ -101,8 +192,7 @@ impl IpSearcher {
         let chunk_count = full_byte_count / 8;
         for i in 0..chunk_count {
             let start = i * 8;
-            let value =
-                u64::from_le_bytes(bitmap[start..start + 8].try_into().unwrap());
+            let value = u64::from_le_bytes(bitmap[start..start + 8].try_into().unwrap());
             count += value.count_ones() as usize;
         }
         for i in (chunk_count * 8)..full_byte_count {
