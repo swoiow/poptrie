@@ -29,7 +29,7 @@ def main() -> None:
     dist_dir = repo_root / "dist"
     cargo_toml = repo_root / "Cargo.toml"
     build_src = repo_root / "build_bin.py"
-    ipsearcher_src = repo_root / "example_production.py"
+    ipsearcher_src = repo_root / "ip_searcher.py"
     setup_template = repo_root / ".github" / "scripts" / "setup.py"
 
     if not cargo_toml.exists():
@@ -37,7 +37,7 @@ def main() -> None:
     if not build_src.exists():
         raise SystemExit("build_bin.py not found")
     if not ipsearcher_src.exists():
-        raise SystemExit("example_production.py not found")
+        raise SystemExit("ip_searcher.py not found")
     if not setup_template.exists():
         raise SystemExit("setup.py template not found")
 
@@ -63,7 +63,7 @@ def main() -> None:
                     shutil.move(str(ext_file), str(target))
 
         shutil.copy2(build_src, package_dir / "build.py")
-        shutil.copy2(ipsearcher_src, package_dir / "ipsearcher.py")
+        shutil.copy2(ipsearcher_src, package_dir / "ip_searcher.py")
         (temp_dir / "setup.py").write_text(setup_py, encoding="utf-8")
 
         wheel.unlink()

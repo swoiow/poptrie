@@ -42,7 +42,7 @@ class TestBuilder(unittest.TestCase):
             target_ip = network.network_address
             if network.num_addresses > 1:
                 target_ip = network.network_address + 1
-            matched = searcher.batch_check_strings([str(target_ip)])[0]
+            matched = searcher.contains_strings([str(target_ip)])[0]
             self.assertTrue(matched)
 
 

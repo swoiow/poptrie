@@ -39,8 +39,12 @@ jobs:
         run: |
           export PYTHONPATH="$GITHUB_WORKSPACE"
           $PYTHON_EXEC .github/scripts/build_cn_bin.py \
-            --url "https://github.com/Loyalsoldier/geoip/raw/refs/heads/release/text/cn.txt" \
-            --output dist/china-ip.bin
+            --cn-url "https://github.com/Loyalsoldier/geoip/raw/refs/heads/release/text/cn.txt" \
+            --geoip-zip-url "https://github.com/Loyalsoldier/geoip/archive/refs/heads/release.zip" \
+            --iana-zip-url "https://github.com/HotCakeX/Official-IANA-IP-blocks/archive/refs/heads/main.zip" \
+            --out-cn dist/geo-cn.dat \
+            --out-geoip dist/bgp-geoip.dat \
+            --out-iana dist/iana-geoip.bin
 
       - name: Set release tag
         run: echo "CRON_TAG=cron-$(date -u +%Y%m%d)" >> $GITHUB_ENV
@@ -50,7 +54,10 @@ jobs:
         with:
           tag_name: ${{ env.CRON_TAG }}
           name: ${{ env.CRON_TAG }}
-          files: dist/china-ip.bin
+          files: |
+            dist/geo-cn.dat
+            dist/bgp-geoip.dat
+            dist/iana-geoip.bin
 
       - name: Cleanup old cron releases
         uses: actions/github-script@v7

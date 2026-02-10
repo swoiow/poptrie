@@ -1,118 +1,46 @@
 # poptrie
 
-Fast IP membership lookup backed by a Rust implementation and exposed to Python via PyO3.
+Fast IP lookup backed by a Rust implementation and exposed to Python via PyO3.
 
 Chinese version: [`README-CN.md`](./README-CN.md).
 
 ## Requirements
 
 - Python 3.8+
-- Rust toolchain
-- `maturin`
 
-## Build and Install
-
-Create a virtual environment and install the module in dev mode:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip maturin
-maturin develop --release
-```
-
-Build wheels:
-
-```bash
-maturin build --release --out dist
-```
-
-## Build the Binary Data
-
-The searcher reads a binary file produced by `build_bin.py`.
-
-```bash
-python build_bin.py
-```
-
-If you change the builder logic, rebuild the bin file to match the 72-byte node alignment.
-
-## Python Usage
+## Python Usage (V2)
 
 ```python
 import socket
 from pathlib import Path
 
-import poptrie
+from ip_searcher import IpSearcher
 
 
-bin_path = Path("china_ip.bin")
-searcher = poptrie.IpSearcher(str(bin_path))
+bin_path = Path("china-ip.bin")
+searcher = IpSearcher(bin_path)
 
 ip_bytes = socket.inet_pton(socket.AF_INET, "1.0.1.1")
-print(searcher.is_china_ip(ip_bytes))
+print(searcher.contains_ip("1.0.1.1"))
+print(searcher.lookup_country("1.0.1.1"))
+print(searcher.is_cn("1.0.1.1"))
 
 ips = ["1.0.1.1", "8.8.8.8", "240e::1", "2001:db8::"]
-print(searcher.batch_check_strings(ips))
+print(searcher.contains_ips(ips))
+print(searcher.lookup_countries(ips))  # ("ip", "CN" or None)
+print(searcher.is_cn_batch(ips))
 
 v4_ips = ["1.0.1.1", "8.8.8.8", "110.16.0.1", "127.0.0.1"]
 packed_v4 = b"".join(socket.inet_pton(socket.AF_INET, ip) for ip in v4_ips)
-print(searcher.batch_check_packed(packed_v4, is_v6=False))
-```
-
-## Python Helper Class
-
-If you want a lightweight Python-facing wrapper with docstrings, you can use this class:
-
-```python
-from __future__ import annotations
-
-from pathlib import Path
-from typing import Iterable
-
-import poptrie
-
-
-class IpSearcher:
-    """Poptrie IP lookup wrapper backed by Rust.
-
-    :param bin_path: Path to the binary data file.
-    """
-
-    def __init__(self, bin_path: str | Path) -> None:
-        self._searcher = poptrie.IpSearcher(str(bin_path))
-
-    def is_china_ip(self, ip_bytes: bytes) -> bool:
-        """Check a single IPv4/IPv6 address in packed bytes.
-
-        :param ip_bytes: 4-byte IPv4 or 16-byte IPv6.
-        :return: True if matched, otherwise False.
-        """
-        return self._searcher.is_china_ip(ip_bytes)
-
-    def batch_check_strings(self, ips: Iterable[str]) -> list[bool]:
-        """Check a list of IP strings, preserving input order.
-
-        :param ips: IP strings (IPv4 or IPv6).
-        :return: Match results aligned to input order.
-        """
-        return self._searcher.batch_check_strings(list(ips))
-
-    def batch_check_packed(self, packed_ips: bytes, is_v6: bool) -> list[bool]:
-        """Check a packed byte buffer containing IPv4 or IPv6 addresses.
-
-        :param packed_ips: Flat buffer of IP bytes.
-        :param is_v6: True when each IP is 16 bytes, False for 4 bytes.
-        :return: Match results aligned to the packed order.
-        """
-        return self._searcher.batch_check_packed(packed_ips, is_v6=is_v6)
+print(searcher.contains_ips_fast(packed_v4, is_v6=False))
+print(searcher.lookup_countries_fast(packed_v4, is_v6=False))
+print(searcher.is_cn_fast(packed_v4, is_v6=False))
 ```
 
 ## API Notes
 
-- `is_china_ip` accepts IPv4/IPv6 bytes (`len == 4` or `len == 16`).
-- `batch_check_strings` keeps input order and parses strings in Rust.
-- `batch_check_packed` expects a flat byte buffer with a fixed stride of 4 or 16.
+- Country codes are returned as u16 in Rust, converted to 2-letter strings in Python.
+- `*_fast` methods are for high-throughput packed inputs (stride 4/16).
 
 ## Tests
 
@@ -126,5 +54,5 @@ Run the included example:
 
 ```bash
 python example.py
-python example_production.py
+python ip_searcher.py
 ```
