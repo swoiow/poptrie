@@ -108,9 +108,9 @@ jobs:
 
       - name: Repack wheels
         run: |
-          $PYTHON_EXEC .github/scripts/repack_wheels.py \
-            --private-src "$GITHUB_WORKSPACE/private-src" \
-            --dist dist
+          POPTRIE_PRIVATE_SRC="$GITHUB_WORKSPACE/private-src" \
+          POPTRIE_DIST_DIR="dist" \
+          $PYTHON_EXEC .github/scripts/repack_wheels.py
 
       - name: Install wheel
         run: $PYTHON_EXEC -m pip install dist/*.whl

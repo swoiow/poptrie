@@ -2,6 +2,7 @@
 if you want to repack with details, please check the git log, before “less code repack, make it simple.”
 """
 
+import os
 import shutil
 import subprocess
 import sys
@@ -26,16 +27,14 @@ def _load_setup_template(template_path: Path, version: str) -> str:
 
 def main() -> None:
     repo_root = Path.cwd()
-    dist_dir = repo_root / "dist"
-    cargo_toml = repo_root / "Cargo.toml"
-    build_src = repo_root / "build_bin.py"
+    private_root = Path(os.environ["POPTRIE_PRIVATE_SRC"])
+    dist_dir = repo_root / os.environ.get("POPTRIE_DIST_DIR", "dist")
+    cargo_toml = private_root / "Cargo.toml"
     ipsearcher_src = repo_root / "ip_searcher.py"
     setup_template = repo_root / ".github" / "scripts" / "setup.py"
 
     if not cargo_toml.exists():
         raise SystemExit("Cargo.toml not found")
-    if not build_src.exists():
-        raise SystemExit("build_bin.py not found")
     if not ipsearcher_src.exists():
         raise SystemExit("ip_searcher.py not found")
     if not setup_template.exists():
@@ -62,7 +61,6 @@ def main() -> None:
                 if not target.exists():
                     shutil.move(str(ext_file), str(target))
 
-        shutil.copy2(build_src, package_dir / "build.py")
         shutil.copy2(ipsearcher_src, package_dir / "ip_searcher.py")
         (temp_dir / "setup.py").write_text(setup_py, encoding="utf-8")
 
