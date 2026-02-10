@@ -1,0 +1,86 @@
+name: Cron CN Bin Release
+
+on:
+  schedule:
+    - cron: "0 1 */14 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cron-bin
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Create venv
+        run: |
+          python -m venv .venv
+          echo "PYTHON_EXEC=$PWD/.venv/bin/python" >> $GITHUB_ENV
+
+      - name: Install build deps
+        run: $PYTHON_EXEC -m pip install --upgrade pip
+
+      - name: Build CN bin
+        run: |
+          export PYTHONPATH="$GITHUB_WORKSPACE"
+          $PYTHON_EXEC .github/scripts/build_cn_bin.py \
+            --cn-url "https://github.com/Loyalsoldier/geoip/raw/refs/heads/release/text/cn.txt" \
+            --geoip-zip-url "https://github.com/Loyalsoldier/geoip/archive/refs/heads/release.zip" \
+            --iana-zip-url "https://github.com/HotCakeX/Official-IANA-IP-blocks/archive/refs/heads/main.zip" \
+            --out-cn dist/geo-cn.dat \
+            --out-geoip dist/bgp-geoip.dat \
+            --out-iana dist/iana-geoip.bin
+
+      - name: Set release tag
+        run: echo "CRON_TAG=cron-$(date -u +%Y%m%d)" >> $GITHUB_ENV
+
+      - name: Publish cron release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.CRON_TAG }}
+          name: ${{ env.CRON_TAG }}
+          files: |
+            dist/geo-cn.dat
+            dist/bgp-geoip.dat
+            dist/iana-geoip.bin
+
+      - name: Cleanup old cron releases
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            const cronReleases = releases
+              .filter((release) => release.tag_name.startsWith("cron-"))
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            const toDelete = cronReleases.slice(3);
+            for (const release of toDelete) {
+              await github.rest.repos.deleteRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.id,
+              });
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${release.tag_name}`,
+              });
+            }
