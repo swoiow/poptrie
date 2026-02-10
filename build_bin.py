@@ -1,136 +1,220 @@
+import argparse
 import socket
 import struct
+from pathlib import Path
+
+
+class Node:
+    __slots__ = ["children", "is_leaf", "value"]
+
+    def __init__(self):
+        self.children = {}  # byte -> Node
+        self.is_leaf = False
+        self.value = None
 
 
 class BinBuilder:
-    NODE_SIZE = 72  # 32字节Child_BM + 32字节Leaf_BM + 4字节Base_Offset + 4字节Padding
+    # Node layout: [Child_BM 32] [Leaf_BM 32] [Child_Offset u32] [Leaf_Base_Index u32]
+    NODE_SIZE = 72
+    HEADER_SIZE = 16
+    MAGIC = b"PTV2"
 
     def __init__(self):
-        # 根节点：{ 'children': {byte: node_dict}, 'is_leaf': bool }
-        self.root = {'children': {}, 'is_leaf': False}
+        self.root = Node()
 
-    def add_cidr(self, cidr):
+    def add_cidr(self, cidr, value=1):
         """添加并自动合并子网"""
-        ip_part, mask_part = cidr.split('/')
-        mask = int(mask_part)
-        family = socket.AF_INET6 if ':' in ip_part else socket.AF_INET
-        ip_bytes = socket.inet_pton(family, ip_part)
+        if not (1 <= value <= 0xFFFF):
+            raise ValueError("value must be in range 1..65535")
+
+        try:
+            ip_part, mask_part = cidr.split("/")
+            mask = int(mask_part)
+            family = socket.AF_INET6 if ":" in ip_part else socket.AF_INET
+            ip_bytes = socket.inet_pton(family, ip_part)
+        except Exception:
+            return
 
         curr = self.root
-        steps = mask // 8
-        remaining = mask % 8
+        steps = mask >> 3  # mask // 8
+        remaining = mask & 7  # mask % 8
 
-        # 1. 沿路径向下寻址
+        # 1. 沿路径前进，如果中途遇到更短的叶子（已覆盖），直接返回
         for i in range(steps):
-            # 如果路径中已经存在叶子节点，说明当前 CIDR 已被更大网段覆盖，直接返回
-            if curr['is_leaf']:
+            if curr.is_leaf:
                 return
 
             byte = ip_bytes[i]
-            if byte not in curr['children']:
-                curr['children'][byte] = {'children': {}, 'is_leaf': False}
-            curr = curr['children'][byte]
+            if byte not in curr.children:
+                curr.children[byte] = Node()
+            curr = curr.children[byte]
 
-        # 2. 处理剩余位或结束位
+        # 2. 处理末尾位
         if remaining == 0:
-            # 正好整除，标记为叶子，并清理其下的所有子节点（因为大网覆盖小网）
-            curr['is_leaf'] = True
-            curr['children'] = {}
+            curr.is_leaf = True
+            curr.value = value
+            curr.children = {}  # 覆盖所有更长的子路径
         else:
-            # 处理非对齐掩码，如 /18 在第 3 字节有 2 位
+            if curr.is_leaf:
+                return
             shift = 8 - remaining
             start_byte = ip_bytes[steps] & (0xFF << shift)
             end_byte = start_byte | (0xFF >> remaining)
 
             for b in range(start_byte, end_byte + 1):
-                # 如果这个范围内的某个字节已经存在，递归处理它
-                if b not in curr['children']:
-                    curr['children'][b] = {'children': {}, 'is_leaf': True}
-                else:
-                    # 如果已存在，将其标记为叶子，并剪枝其子树
-                    curr['children'][b]['is_leaf'] = True
-                    curr['children'][b]['children'] = {}
+                # 标记为叶子节点
+                n = Node()
+                n.is_leaf = True
+                n.value = value
+                curr.children[b] = n
 
     def _prune(self, node):
-        """递归剪枝：如果 256 个子节点全是叶子，合并为父节点叶子"""
-        if not node['children']:
-            return node['is_leaf']
+        """递归剪枝：如果 256 个子节点全是叶子且值一致，合并为父节点叶子"""
+        if not node.children:
+            return node.is_leaf
 
-        # 先递归剪枝子节点
-        all_children_are_leaf = len(node['children']) == 256
-        for b in list(node['children'].keys()):
-            child_is_leaf = self._prune(node['children'][b])
+        all_children_are_leaf = (len(node.children) == 256)
+        first_value = None
+
+        # 遍历子节点进行递归剪枝
+        for b in list(node.children.keys()):
+            child = node.children[b]
+            child_is_leaf = self._prune(child)
             if not child_is_leaf:
                 all_children_are_leaf = False
+            elif all_children_are_leaf:
+                if first_value is None:
+                    first_value = child.value
+                elif child.value != first_value:
+                    all_children_are_leaf = False
 
-        # 如果 256 个子节点全满且都是叶子，则向上合并
-        if all_children_are_leaf:
-            node['is_leaf'] = True
-            node['children'] = {}
+        if all_children_are_leaf and first_value is not None:
+            node.is_leaf = True
+            node.value = first_value
+            node.children = {}
             return True
 
-        return node['is_leaf']
+        return node.is_leaf
 
     def save(self, output_path):
-        """执行剪枝并序列化为 BFS 结构的二进制文件"""
-        # 1. 先进行全局剪枝优化压缩率
+        """序列化为 BFS 结构的二进制文件"""
+        print("Pruning tree...")
         self._prune(self.root)
 
         final_data = bytearray()
+        values = []
         current_layer = [self.root]
-        # 下一层节点在文件中的起始偏移（根节点之后）
-        next_layer_start_offset = self.NODE_SIZE
+        # 初始偏移量：Header 之后就是第一层节点
+        next_layer_start_offset = self.HEADER_SIZE + len(current_layer) * self.NODE_SIZE
 
+        print("Serializing...")
         while current_layer:
             next_layer = []
             for node in current_layer:
-                child_bm = bytearray(32)
-                leaf_bm = bytearray(32)
+                child_bm_int = 0
+                leaf_bm_int = 0
 
-                # 获取 0-255 的排序键
-                sorted_keys = sorted(node['children'].keys())
+                # 按照索引顺序处理子节点
+                sorted_indices = sorted(node.children.keys())
 
-                # 收集本节点中有子树的节点，它们将排在 next_layer
                 nodes_with_children = []
+                local_leaf_values = []
+                for k in sorted_indices:
+                    child_node = node.children[k]
+                    # 计算 bit 在 256 位中的位置 (Big-Endian)
+                    bit_pos = 255 - k
 
-                for k in sorted_keys:
-                    child_node = node['children'][k]
+                    if child_node.is_leaf:
+                        leaf_bm_int |= (1 << bit_pos)
+                        local_leaf_values.append(child_node.value)
 
-                    # 标记 Leaf Bitmap: 只要这个字节是终点
-                    if child_node['is_leaf']:
-                        leaf_bm[k >> 3] |= (1 << (7 - (k % 8)))
-
-                    # 标记 Child Bitmap: 只有还有子树的才标记，用于跳转
-                    if child_node['children']:
-                        child_bm[k >> 3] |= (1 << (7 - (k % 8)))
+                    if child_node.children:
+                        child_bm_int |= (1 << bit_pos)
                         nodes_with_children.append(child_node)
 
-                # 写入节点数据
-                final_data.extend(child_bm)
-                final_data.extend(leaf_bm)
+                # 快速将 256 位整数转为 32 字节
+                final_data.extend(child_bm_int.to_bytes(32, "big"))
+                final_data.extend(leaf_bm_int.to_bytes(32, "big"))
 
+                base_index = len(values)
+                values.extend(local_leaf_values)
+
+                jump_offset = 0
                 if nodes_with_children:
-                    # 记录跳转到下一层这些子节点的起始偏移
-                    final_data.extend(struct.pack("<II", next_layer_start_offset, 0))
+                    jump_offset = next_layer_start_offset
                     next_layer.extend(nodes_with_children)
                     next_layer_start_offset += len(nodes_with_children) * self.NODE_SIZE
-                else:
-                    # 没有子节点可跳转
-                    final_data.extend(struct.pack("<II", 0, 0))
+
+                final_data.extend(struct.pack("<II", jump_offset, base_index))
 
             current_layer = next_layer
 
+        # 写入文件
+        node_count = len(final_data) // self.NODE_SIZE
+        values_count = len(values)
+        header = struct.pack("<4sIII", self.MAGIC, node_count, values_count, 0)
+
         with open(output_path, "wb") as f:
+            f.write(header)
             f.write(final_data)
-        print(f"构建完成！压缩后大小: {len(final_data) / 1024:.2f} KB")
+            # 分块写入 values (u16)
+            for i in range(0, len(values), 1000):
+                chunk = values[i:i + 1000]
+                f.write(struct.pack(f"<{len(chunk)}H", *chunk))
+
+        total_size_kb = (len(header) + len(final_data) + values_count * 2) / 1024
+        print(f"Build complete. Nodes: {node_count}, Values: {values_count}, Size: {total_size_kb:.2f} KB")
 
 
-if __name__ == '__main__':
-    # --- 使用方式 ---
+def country_code_to_u16(country_code):
+    country_code = country_code.upper()
+    return (ord(country_code[0]) << 8) | ord(country_code[1])
+
+
+def load_txt_dir(builder, txt_dir):
+    all_cidrs = []
+    print(f"Loading files from {txt_dir}...")
+    for path in Path(txt_dir).glob("*.txt"):
+        country_code = path.stem.upper()
+        if len(country_code) != 2:
+            continue
+        val = country_code_to_u16(country_code)
+        with path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    all_cidrs.append((line, val))
+
+    # 核心优化：按掩码长度从小到大排序
+    # 这样大子网会先添加，小子网在 add_cidr 中会被快速跳过
+    print(f"Sorting {len(all_cidrs)} CIDRs by mask length...")
+    all_cidrs.sort(key=lambda x: int(x[0].split("/")[1]))
+
+    print("Building tree...")
+    for cidr, val in all_cidrs:
+        builder.add_cidr(cidr, val)
+
+
+def load_txt_dirs(builder, txt_dirs):
+    for txt_dir in txt_dirs:
+        load_txt_dir(builder, txt_dir)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Build poptrie binary from TXT directory.")
+    parser.add_argument("--input", help="Input TXT directory", default=None)
+    parser.add_argument("--output", help="Output bin file path", default="./geoip.bin")
+    args = parser.parse_args()
+
     builder = BinBuilder()
-    # 这里放入你收集的中国 IP CIDR 列表
-    china_cidrs = ["1.0.1.0/24", "110.16.0.0/12", "240e::/18"]
-    for c in china_cidrs:
-        builder.add_cidr(c)
 
-    builder.save("china_ip.bin")
+    input_dir = args.input
+    if input_dir and Path(input_dir).exists():
+        load_txt_dir(builder, input_dir)
+        builder.save(args.output)
+    else:
+        print("Error: No valid input directory found.")
+
+
+if __name__ == "__main__":
+    main()
