@@ -1,20 +1,14 @@
 # poptrie
 
-Fast IP lookup backed by a Rust implementation and exposed to Python via PyO3.
+High-performance IP lookup backed by Rust. This public repo only ships wheels; it does not include build tooling.
 
-Chinese version: [`README-CN.md`](./README-CN.md).
-
-## Requirements
-
-- Python 3.8+
-
-## Python Usage (V2)
+## Usage
 
 ```python
 import socket
 from pathlib import Path
 
-from ip_searcher import IpSearcher
+from poptrie.ip_searcher import IpSearcher
 
 
 bin_path = Path("china-ip.bin")
@@ -37,22 +31,13 @@ print(searcher.lookup_countries_fast(packed_v4, is_v6=False))
 print(searcher.is_cn_fast(packed_v4, is_v6=False))
 ```
 
-## API Notes
-
-- Country codes are returned as u16 in Rust, converted to 2-letter strings in Python.
-- `*_fast` methods are for high-throughput packed inputs (stride 4/16).
-
-## Tests
-
-```bash
-python -m unittest discover tests
-```
-
 ## Example
-
-Run the included example:
 
 ```bash
 python example.py
-python ip_searcher.py
 ```
+
+## Notes
+
+- Country codes are returned as u16 in Rust and converted to 2-letter strings in Python.
+- `*_fast` methods are for high-throughput packed inputs (stride 4/16).

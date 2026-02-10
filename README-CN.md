@@ -1,18 +1,14 @@
 # poptrie
 
-基于 Rust 的高性能 IP 查询库，通过 PyO3 暴露给 Python。
+基于 Rust 的高性能 IP 查询库。公共仓只发布 wheel，不提供构建工具。
 
-## 环境要求
-
-- Python 3.8+
-
-## Python 使用示例（V2）
+## 使用示例
 
 ```python
 import socket
 from pathlib import Path
 
-from ip_searcher import IpSearcher
+from poptrie.ip_searcher import IpSearcher
 
 
 bin_path = Path("china-ip.bin")
@@ -35,22 +31,13 @@ print(searcher.lookup_countries_fast(packed_v4, is_v6=False))
 print(searcher.is_cn_fast(packed_v4, is_v6=False))
 ```
 
-## API 说明
-
-- 国家码在 Rust 中以 u16 返回，Python 层负责转为 2 位字符串。
-- `*_fast` 适合高吞吐场景，使用 4/16 字节步长扁平化字节流。
-
-## 测试
-
-```bash
-python -m unittest discover tests
-```
-
 ## 示例
-
-运行内置示例：
 
 ```bash
 python example.py
-python ip_searcher.py
 ```
+
+## 说明
+
+- Rust 返回 u16 国家码，Python 负责转换为 2 位字符串。
+- `*_fast` 适合高吞吐场景，使用 4/16 字节步长扁平化字节流。
