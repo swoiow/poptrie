@@ -14,21 +14,19 @@ from poptrie.ip_searcher import IpSearcher
 bin_path = Path("china-ip.bin")
 searcher = IpSearcher(bin_path)
 
-ip_bytes = socket.inet_pton(socket.AF_INET, "1.0.1.1")
-print(searcher.contains_ip("1.0.1.1"))
-print(searcher.lookup_country("1.0.1.1"))
-print(searcher.is_cn("1.0.1.1"))
+print("1.0.1.1" in searcher)
+print(searcher.lookup("1.0.1.1"))
+print(searcher.get_country("1.0.1.1"))
+print(searcher.is_china("1.0.1.1"))
 
 ips = ["1.0.1.1", "8.8.8.8", "240e::1", "2001:db8::"]
-print(searcher.contains_ips(ips))
-print(searcher.lookup_countries(ips))  # ("ip", "CN" or None)
-print(searcher.is_cn_batch(ips))
+print(searcher.batch_lookup(ips))
+print(searcher.batch_get_countries(ips))
 
 v4_ips = ["1.0.1.1", "8.8.8.8", "110.16.0.1", "127.0.0.1"]
 packed_v4 = b"".join(socket.inet_pton(socket.AF_INET, ip) for ip in v4_ips)
-print(searcher.contains_ips_fast(packed_v4, is_v6=False))
-print(searcher.lookup_countries_fast(packed_v4, is_v6=False))
-print(searcher.is_cn_fast(packed_v4, is_v6=False))
+print(searcher.lookup_fast(packed_v4, is_v6=False))
+print(searcher.get_countries_fast(packed_v4, is_v6=False))
 ```
 
 ## Example
