@@ -69,6 +69,7 @@ def _build_geoip_text(output_path: Path, zip_url: str) -> None:
 
 
 def _build_iana(output_path: Path, zip_url: str) -> None:
+    """ TODO: 需要精细化的 IANA 数据时，使用 https://github.com/harmonsir/iana-geoip """
     temp_dir = Path(tempfile.mkdtemp())
     try:
         _download_zip(zip_url, temp_dir)
