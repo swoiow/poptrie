@@ -90,7 +90,7 @@ def main() -> None:
     parser.add_argument("--iana-zip-url", required=True, help="IANA zip URL")
     parser.add_argument("--out-cn", required=True, help="Output geo-cn.dat path")
     parser.add_argument("--out-geoip", required=True, help="Output bgp-geoip.dat path")
-    parser.add_argument("--out-iana", required=True, help="Output iana-geoip.bin path")
+    parser.add_argument("--out-iana", required=True, help="Output iana-geoip.dat path")
     args = parser.parse_args()
 
     _build_cn(Path(args.out_cn), args.cn_url)
