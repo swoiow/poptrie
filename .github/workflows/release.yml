@@ -88,9 +88,14 @@ jobs:
           path: private-src
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
 
       - name: Cache Cargo
         uses: actions/cache@v4
@@ -141,7 +146,7 @@ jobs:
           $PYTHON_EXEC -m unittest discover "$GITHUB_WORKSPACE/private-src/tests"
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}
           path: dist/*
@@ -166,7 +171,7 @@ jobs:
           path: private-src
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
@@ -229,7 +234,7 @@ jobs:
             }
 
       - name: Download wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: dist
           merge-multiple: true
@@ -276,7 +281,7 @@ jobs:
           path: private-src
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
