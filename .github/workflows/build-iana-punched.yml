@@ -1,0 +1,81 @@
+name: Build IANA Punched Dat
+
+on:
+  workflow_call:
+    inputs:
+      private_src_repo_slug:
+        description: "Private source repository slug"
+        required: true
+        type: string
+      private_src_ref:
+        description: "Private source repository ref"
+        required: false
+        default: "main"
+        type: string
+    secrets:
+      iana_private_repo_token:
+        description: "Token for iana private repository checkout"
+        required: true
+      poptrie_private_repo_token:
+        description: "Token for private repository checkout"
+        required: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout public repo
+        uses: actions/checkout@v6
+
+      - name: Checkout private iana repo
+        uses: actions/checkout@v6
+        with:
+          repository: harmonsir/iana-geoip
+          token: ${{ secrets.iana_private_repo_token }}
+          ref: main
+          path: iana-src
+
+      - name: Checkout private repo
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ inputs.private_src_repo_slug }}
+          token: ${{ secrets.poptrie_private_repo_token }}
+          ref: ${{ inputs.private_src_ref }}
+          path: private-src
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Build punched iana-geoip.dat via Rust
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          rm -rf iana-data
+          git clone --depth 1 https://github.com/HotCakeX/Official-IANA-IP-blocks iana-data
+          cargo build --release --manifest-path iana-src/Cargo.toml
+          ./iana-src/target/release/geoip_checker process \
+            --ipv4-dir iana-data/TXT/IPV4 \
+            --ipv6-dir iana-data/TXT/IPV6 \
+            --output-dir iana-src/TXT
+          ./iana-src/target/release/geoip_checker check --output-dir iana-src/TXT
+          python "$GITHUB_WORKSPACE/private-src/build_bin.py" \
+            --input "$GITHUB_WORKSPACE/iana-src/TXT" \
+            --output "$GITHUB_WORKSPACE/dist/iana-geoip.dat"
+
+      - name: Upload punched iana dat
+        uses: actions/upload-artifact@v6
+        with:
+          name: iana-punched-dat
+          path: dist/iana-geoip.dat
+          retention-days: 3

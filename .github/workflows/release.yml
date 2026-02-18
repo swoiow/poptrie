@@ -56,6 +56,16 @@ jobs:
               });
             }
 
+  build_iana_punched:
+    if: github.event_name == 'push' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (inputs.run_build == 'true' || inputs.run_cron == 'true'))
+    uses: ./.github/workflows/build-iana-punched.yml
+    with:
+      private_src_repo_slug: ${{ vars.POPTRIE_PRIVATE_REPO_SLUG }}
+      private_src_ref: ${{ vars.POPTRIE_PRIVATE_REPO_REF || 'main' }}
+    secrets:
+      iana_private_repo_token: ${{ secrets.HARMONSIR_IANA_GEOIP_REPO_TOKEN }}
+      poptrie_private_repo_token: ${{ secrets.GH_POPTRIE_TOKEN }}
+
   build:
     runs-on: ${{ matrix.os }}
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.run_build == 'true')
@@ -154,7 +164,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    needs: build
+    needs: [ build, build_iana_punched ]
     permissions:
       contents: write
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.run_build == 'true')
@@ -249,7 +259,14 @@ jobs:
             --iana-zip-url "https://github.com/HotCakeX/Official-IANA-IP-blocks/archive/refs/heads/main.zip" \
             --out-cn dist/geo-cn.dat \
             --out-geoip dist/bgp-geoip.dat \
-            --out-iana dist/iana-geoip.dat
+            --out-iana dist/iana-geoip-std.dat
+
+      - name: Download punched iana dat
+        uses: actions/download-artifact@v7
+        continue-on-error: false
+        with:
+          name: iana-punched-dat
+          path: dist
 
       - name: Publish latest release
         uses: softprops/action-gh-release@v2
@@ -257,14 +274,17 @@ jobs:
           tag_name: latest
           name: latest
           generate_release_notes: true
+          fail_on_unmatched_files: false
           files: |
             dist/*.whl
             dist/geo-cn.dat
             dist/bgp-geoip.dat
             dist/iana-geoip.dat
+            dist/iana-geoip-std.dat
 
   cron_release:
     runs-on: ubuntu-latest
+    needs: build_iana_punched
     permissions:
       contents: write
     if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_cron == 'true')
@@ -303,7 +323,14 @@ jobs:
             --iana-zip-url "https://github.com/HotCakeX/Official-IANA-IP-blocks/archive/refs/heads/main.zip" \
             --out-cn dist/geo-cn.dat \
             --out-geoip dist/bgp-geoip.dat \
-            --out-iana dist/iana-geoip.dat
+            --out-iana dist/iana-geoip-std.dat
+
+      - name: Download punched iana dat
+        uses: actions/download-artifact@v7
+        continue-on-error: false
+        with:
+          name: iana-punched-dat
+          path: dist
 
       - name: Set release tag
         run: echo "CRON_TAG=cron-$(date -u +%Y%m%d)" >> $GITHUB_ENV
@@ -313,6 +340,7 @@ jobs:
         with:
           tag_name: ${{ env.CRON_TAG }}
           name: ${{ env.CRON_TAG }}
+          fail_on_unmatched_files: false
           files: |
             dist/geo-cn.dat
             dist/bgp-geoip.dat
