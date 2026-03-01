@@ -39,3 +39,8 @@ python example.py
 
 - Country codes are returned as u16 in Rust and converted to 2-letter strings in Python.
 - `*_fast` methods are for high-throughput packed inputs (stride 4/16).
+
+## Dataset
+
+- Loyalsoldier/geoip
+- HotCakeX/Official-IANA-IP-blocks
