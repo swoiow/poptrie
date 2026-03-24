@@ -30,11 +30,14 @@ def main() -> None:
     private_root = Path(os.environ["POPTRIE_PRIVATE_SRC"])
     dist_dir = repo_root / os.environ.get("POPTRIE_DIST_DIR", "dist")
     cargo_toml = private_root / "Cargo.toml"
+    init_src = repo_root / "__init__.py"
     ipsearcher_src = repo_root / "ip_searcher.py"
     setup_template = repo_root / ".github" / "scripts" / "setup.py"
 
     if not cargo_toml.exists():
         raise SystemExit("Cargo.toml not found")
+    if not init_src.exists():
+        raise SystemExit("__init__.py not found")
     if not ipsearcher_src.exists():
         raise SystemExit("ip_searcher.py not found")
     if not setup_template.exists():
@@ -61,6 +64,7 @@ def main() -> None:
                 if not target.exists():
                     shutil.move(str(ext_file), str(target))
 
+        shutil.copy2(init_src, package_dir / "__init__.py")
         shutil.copy2(ipsearcher_src, package_dir / "ip_searcher.py")
         (temp_dir / "setup.py").write_text(setup_py, encoding="utf-8")
 

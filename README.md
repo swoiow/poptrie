@@ -8,7 +8,7 @@ High-performance IP lookup backed by Rust. This public repo only ships wheels; i
 import socket
 from pathlib import Path
 
-from poptrie.ip_searcher import IpSearcher
+from poptrie import IpSearcher
 
 
 bin_path = Path("china-ip.bin")
