@@ -108,12 +108,17 @@ jobs:
           toolchain: stable
 
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
+        uses: actions/cache@v5
         with:
-          workspaces: |
-            private-src -> target
-          cache-targets: true
-          cache-on-failure: true
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            private-src/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('private-src/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
       - name: Create venv
         run: |
@@ -145,12 +150,11 @@ jobs:
       - name: Install wheel
         run: $PYTHON_EXEC -m pip install dist/*.whl
 
-      - name: Run Tests
+      - name: Run Public Facade Tests
         env:
-          POPTRIE_TEST_GEOIP_URL: "https://github.com/Loyalsoldier/geoip/raw/refs/heads/release/text/cn.txt"
           PYTHONPATH: ${{ github.workspace }}/private-src
         run: |
-          $PYTHON_EXEC -m unittest discover "$GITHUB_WORKSPACE/private-src/tests"
+          $PYTHON_EXEC -m unittest discover "$GITHUB_WORKSPACE/tests"
 
       - name: Upload wheels
         uses: actions/upload-artifact@v6

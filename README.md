@@ -1,6 +1,11 @@
 # poptrie
 
-High-performance IP lookup backed by Rust. This public repo only ships wheels; it does not include build tooling.
+High-performance IP lookup backed by Rust. This public repository owns the final Python facade and publishes wheels.
+
+Stable public contract:
+- `from poptrie import IpSearcher`
+- `IpSearcher` resolves to `poptrie.ip_searcher.IpSearcher`
+- native extension details are intentionally hidden behind the facade
 
 ## Usage
 
@@ -35,12 +40,16 @@ print(searcher.get_countries_fast(packed_v4, is_v6=False))
 python example.py
 ```
 
+## Tests
+
+Public facade verification:
+
+```bash
+PYTHONPATH=<private-src> python -m unittest discover tests
+```
+
 ## Notes
 
 - Country codes are returned as u16 in Rust and converted to 2-letter strings in Python.
 - `*_fast` methods are for high-throughput packed inputs (stride 4/16).
-
-## Dataset
-
-- Loyalsoldier/geoip
-- HotCakeX/Official-IANA-IP-blocks
+- Wheel repack injects the public `__init__.py` and `ip_searcher.py` into the final package.
