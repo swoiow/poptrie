@@ -5,7 +5,7 @@ import socket
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
-import poptrie
+from .poptrie import IpSearcher as NativeIpSearcher
 
 
 class PoptrieError(Exception):
@@ -33,7 +33,7 @@ class IpSearcher:
             raise FileNotFoundError(f"Binary file not found: {self.path}")
 
         try:
-            self._searcher = poptrie.IpSearcher(str(self.path))
+            self._searcher = NativeIpSearcher(str(self.path))
         except Exception as e:
             raise PoptrieError(f"Failed to load Poptrie database: {e}")
 
@@ -84,7 +84,7 @@ class IpSearcher:
     # --- Single Lookup API ---
 
     def __contains__(self, ip: str) -> bool:
-        """Usage: '1.2.3.4' in searcher"""
+        """Usage: '1.2.3.4' in searcher."""
         try:
             return self.lookup(ip)
         except Exception:

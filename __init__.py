@@ -1,9 +1,4 @@
-from . import poptrie as _native
-from .ip_searcher import IpSearcher, PoptrieError  # noqa
-from .poptrie import *
+from poptrie.ip_searcher import IpSearcher, PoptrieError
 
 
-__doc__ = _native.__doc__
-
-_native_all = getattr(_native, "__all__", [])
-__all__ = [name for name in _native_all if name != "IpSearcher"] + ["IpSearcher", "PoptrieError"]
+__all__ = ["IpSearcher", "PoptrieError"]
