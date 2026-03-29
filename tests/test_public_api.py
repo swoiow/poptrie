@@ -8,6 +8,8 @@ from build_bin import BinBuilder
 
 
 class TestPublicApi(unittest.TestCase):
+    CN_CODE = (ord("C") << 8) | ord("N")
+
     @classmethod
     def setUpClass(cls):
         temp_dir = tempfile.TemporaryDirectory()
@@ -15,8 +17,8 @@ class TestPublicApi(unittest.TestCase):
         cls.bin_path = Path(temp_dir.name) / "public-test.bin"
 
         builder = BinBuilder()
-        builder.add_cidr("1.0.1.0/24")
-        builder.add_cidr("240e::/18")
+        builder.add_cidr("1.0.1.0/24", cls.CN_CODE)
+        builder.add_cidr("240e::/18", cls.CN_CODE)
         builder.save(str(cls.bin_path))
 
         cls.searcher = IpSearcher(cls.bin_path)
