@@ -32,6 +32,8 @@ def main() -> None:
     cargo_toml = private_root / "Cargo.toml"
     init_src = repo_root / "__init__.py"
     ipsearcher_src = repo_root / "ip_searcher.py"
+    readme_src = repo_root / "README.md"
+    license_src = repo_root / "LICENSE"
     setup_template = repo_root / ".github" / "scripts" / "setup.py"
 
     if not cargo_toml.exists():
@@ -40,6 +42,10 @@ def main() -> None:
         raise SystemExit("__init__.py not found")
     if not ipsearcher_src.exists():
         raise SystemExit("ip_searcher.py not found")
+    if not readme_src.exists():
+        raise SystemExit("README.md not found")
+    if not license_src.exists():
+        raise SystemExit("LICENSE not found")
     if not setup_template.exists():
         raise SystemExit("setup.py template not found")
 
@@ -66,6 +72,8 @@ def main() -> None:
 
         shutil.copy2(init_src, package_dir / "__init__.py")
         shutil.copy2(ipsearcher_src, package_dir / "ip_searcher.py")
+        shutil.copy2(readme_src, temp_dir / "README.md")
+        shutil.copy2(license_src, temp_dir / "LICENSE")
         (temp_dir / "setup.py").write_text(setup_py, encoding="utf-8")
 
         wheel.unlink()

@@ -7,6 +7,14 @@
 - `IpSearcher` 固定指向 `poptrie.ip_searcher.IpSearcher`
 - native 扩展细节由 facade 封装，不再作为顶层公开语义
 
+## 安装
+
+通过 PyPI 安装：
+
+```bash
+pip install poptrie
+```
+
 ## 使用示例
 
 ```python

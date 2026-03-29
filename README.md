@@ -7,6 +7,14 @@ Stable public contract:
 - `IpSearcher` resolves to `poptrie.ip_searcher.IpSearcher`
 - native extension details are intentionally hidden behind the facade
 
+## Installation
+
+Install from PyPI:
+
+```bash
+pip install poptrie
+```
+
 ## Usage
 
 ```python
