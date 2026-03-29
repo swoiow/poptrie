@@ -11,20 +11,20 @@ def main() -> None:
     searcher = IpSearcher(bin_path)
 
     ip = "1.0.1.1"
-    print(searcher.lookup(ip))
-    print(searcher.get_country(ip))
+    print(searcher.contains_ip(ip))
+    print(searcher.lookup_country(ip))
     print(searcher.is_china(ip))
 
     ips = ["1.0.1.1", "8.8.8.8", "240e::1", "2001:db8::"]
-    print(searcher.batch_lookup(ips))
-    print(searcher.batch_get_countries(ips))
-    print([country == "CN" for country in searcher.batch_get_countries(ips)])
+    print(searcher.contains_ips(ips))
+    print(searcher.lookup_countries(ips))
+    print(searcher.matches_countries(ips, "CN"))
 
     v4_ips = ["1.0.1.1", "8.8.8.8", "110.16.0.1", "127.0.0.1"]
     packed_v4 = b"".join(socket.inet_pton(socket.AF_INET, ip) for ip in v4_ips)
-    print(searcher.lookup_fast(packed_v4, is_v6=False))
-    print(searcher.get_countries_fast(packed_v4, is_v6=False))
-    print([country == "CN" for country in searcher.get_countries_fast(packed_v4, is_v6=False)])
+    print(searcher.contains_packed(packed_v4, is_v6=False))
+    print(searcher.lookup_countries_packed(packed_v4, is_v6=False))
+    print(searcher.matches_country_packed(packed_v4, "CN", is_v6=False))
 
 
 if __name__ == "__main__":
