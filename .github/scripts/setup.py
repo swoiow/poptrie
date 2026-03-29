@@ -20,11 +20,11 @@ setup(
     author="HarmonSir",
     author_email="git@pylab.me",
     license="Apache-2.0",
-    url="https://github.com/swoiow/poptrie-pub",
+    url="https://github.com/swoiow/poptrie",
     project_urls={
-        "Source": "https://github.com/swoiow/poptrie-pub",
-        "Issues": "https://github.com/swoiow/poptrie-pub/issues",
-        "Releases": "https://github.com/swoiow/poptrie-pub/releases",
+        "Source": "https://github.com/swoiow/poptrie",
+        "Issues": "https://github.com/swoiow/poptrie/issues",
+        "Releases": "https://github.com/swoiow/poptrie/releases",
     },
     classifiers=[
         "Development Status :: 4 - Beta",
