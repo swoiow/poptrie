@@ -93,89 +93,19 @@ jobs:
             --out-iana "$DIST_DIR/iana-geoip.dat"
 
       - name: Build overlap reports
+        env:
+          POPTRIE_PRIVATE_SRC: ${{ github.workspace }}/private-src
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/.github/tmp-build-data/cn-text"
-          $PYTHON_EXEC - <<'PY'
-from pathlib import Path
-import os
-import urllib.request
-
-target = Path(os.environ["GITHUB_WORKSPACE"]) / ".github" / "tmp-build-data" / "cn-text" / "CN.txt"
-target.parent.mkdir(parents=True, exist_ok=True)
-with urllib.request.urlopen("https://github.com/Loyalsoldier/geoip/raw/refs/heads/release/text/cn.txt") as response:
-    content = response.read().decode("utf-8")
-lines = []
-for line in content.splitlines():
-    line = line.strip()
-    if not line or line.startswith("#"):
-        continue
-    lines.append(line)
-target.write_text("\n".join(lines) + "\n", encoding="utf-8")
-PY
-          cargo run --release --bin build_geoip -- \
-            --input-dir "$GITHUB_WORKSPACE/.github/tmp-build-data/cn-text" \
-            --output-dat "$DIST_DIR/geo-cn.dat" \
-            --overlap-report "$DIST_DIR/geo-cn-overlap.csv"
-          $PYTHON_EXEC - <<'PY'
-from pathlib import Path
-import tempfile
-import urllib.request
-import zipfile
-import subprocess
-import os
-
-workspace = Path(os.environ["GITHUB_WORKSPACE"])
-dist_dir = Path(os.environ["DIST_DIR"])
-private_src = workspace / "private-src"
-
-def download_zip(url: str, dest: Path) -> Path:
-    data = urllib.request.urlopen(url).read()
-    zip_path = dest / "archive.zip"
-    zip_path.write_bytes(data)
-    with zipfile.ZipFile(zip_path, "r") as zf:
-        zf.extractall(dest)
-    return dest
-
-def find_dir(root: Path, suffix: str) -> Path:
-    for path in root.rglob("*"):
-        if path.is_dir() and path.as_posix().endswith(suffix):
-            return path
-    raise SystemExit(f"Directory not found: {suffix}")
-
-with tempfile.TemporaryDirectory() as tmp:
-    temp_dir = Path(tmp)
-
-    geoip_dir = temp_dir / "geoip"
-    download_zip("https://github.com/Loyalsoldier/geoip/archive/refs/heads/release.zip", geoip_dir)
-    text_dir = find_dir(geoip_dir, "text")
-    subprocess.run(
-        [
-            "cargo", "run", "--release", "--bin", "build_geoip", "--",
-            "--input-dir", str(text_dir),
-            "--output-dat", str(dist_dir / "bgp-geoip.dat"),
-            "--overlap-report", str(dist_dir / "bgp-geoip-overlap.csv"),
-        ],
-        cwd=private_src,
-        check=True,
-    )
-
-    iana_dir = temp_dir / "iana"
-    download_zip("https://github.com/HotCakeX/Official-IANA-IP-blocks/archive/refs/heads/main.zip", iana_dir)
-    ipv4_dir = find_dir(iana_dir, "TXT/IPV4")
-    ipv6_dir = find_dir(iana_dir, "TXT/IPV6")
-    subprocess.run(
-        [
-            "cargo", "run", "--release", "--bin", "build_geoip", "--",
-            "--ipv4-dir", str(ipv4_dir),
-            "--ipv6-dir", str(ipv6_dir),
-            "--output-dat", str(dist_dir / "iana-geoip.dat"),
-            "--overlap-report", str(dist_dir / "iana-geoip-overlap.csv"),
-        ],
-        cwd=private_src,
-        check=True,
-    )
-PY
-        working-directory: ${{ github.workspace }}/private-src
+          $PYTHON_EXEC .github/scripts/build_overlap_reports.py \
+            --cn-url "https://github.com/Loyalsoldier/geoip/raw/refs/heads/release/text/cn.txt" \
+            --geoip-zip-url "https://github.com/Loyalsoldier/geoip/archive/refs/heads/release.zip" \
+            --iana-zip-url "https://github.com/HotCakeX/Official-IANA-IP-blocks/archive/refs/heads/main.zip" \
+            --out-cn-dat "$DIST_DIR/geo-cn.dat" \
+            --out-cn-overlap "$DIST_DIR/geo-cn-overlap.csv" \
+            --out-geoip-dat "$DIST_DIR/bgp-geoip.dat" \
+            --out-geoip-overlap "$DIST_DIR/bgp-geoip-overlap.csv" \
+            --out-iana-dat "$DIST_DIR/iana-geoip.dat" \
+            --out-iana-overlap "$DIST_DIR/iana-geoip-overlap.csv"
 
       - name: Verify data artifacts
         run: |
