@@ -1,12 +1,11 @@
 import argparse
-import ipaddress
+import os
 import shutil
+import subprocess
 import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
-
-from build_bin import BinBuilder, load_txt_dirs
 
 
 def _load_cidrs(url: str) -> list[str]:
@@ -38,47 +37,75 @@ def _find_dir(root: Path, suffix: str) -> Path:
     raise SystemExit(f"Directory not found: {suffix}")
 
 
-def _validate_first(cidr_list: list[str]) -> None:
-    if not cidr_list:
-        raise SystemExit("No CIDR data found")
-    ipaddress.ip_network(cidr_list[0], strict=False)
+def _resolve_private_src() -> Path:
+    private_src = os.environ.get("POPTRIE_PRIVATE_SRC")
+    if not private_src:
+        raise SystemExit("POPTRIE_PRIVATE_SRC is required")
+    return Path(private_src).resolve()
 
 
-def _build_cn(output_path: Path, url: str) -> None:
-    cidrs = _load_cidrs(url)
-    _validate_first(cidrs)
-    builder = BinBuilder()
-    cn_code = (ord("C") << 8) | ord("N")
-    for cidr in cidrs:
-        builder.add_cidr(cidr, cn_code)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    builder.save(str(output_path))
+def _run_build_geoip(private_src: Path, *args: str) -> None:
+    subprocess.run(
+        ["cargo", "run", "--release", "--bin", "build_geoip", "--", *args],
+        cwd=private_src,
+        check=True,
+    )
 
 
-def _build_geoip_text(output_path: Path, zip_url: str) -> None:
+def _build_cn(output_path: Path, url: str, private_src: Path) -> None:
     temp_dir = Path(tempfile.mkdtemp())
     try:
-        _download_zip(zip_url, temp_dir)
-        text_dir = _find_dir(temp_dir, "text")
-        builder = BinBuilder()
-        load_txt_dirs(builder, [text_dir])
+        cidrs = _load_cidrs(url)
+        if not cidrs:
+            raise SystemExit("No CIDR data found")
+        input_dir = temp_dir / "text"
+        input_dir.mkdir(parents=True, exist_ok=True)
+        (input_dir / "CN.txt").write_text("\n".join(cidrs) + "\n", encoding="utf-8")
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        builder.save(str(output_path))
+        _run_build_geoip(
+            private_src,
+            "--input-dir",
+            str(input_dir),
+            "--output-dat",
+            str(output_path),
+        )
     finally:
         shutil.rmtree(temp_dir)
 
 
-def _build_iana(output_path: Path, zip_url: str) -> None:
-    """ TODO: 需要精细化的 IANA 数据时，使用 https://github.com/harmonsir/iana-geoip """
+def _build_geoip_text(output_path: Path, zip_url: str, private_src: Path) -> None:
+    temp_dir = Path(tempfile.mkdtemp())
+    try:
+        _download_zip(zip_url, temp_dir)
+        text_dir = _find_dir(temp_dir, "text")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        _run_build_geoip(
+            private_src,
+            "--input-dir",
+            str(text_dir),
+            "--output-dat",
+            str(output_path),
+        )
+    finally:
+        shutil.rmtree(temp_dir)
+
+
+def _build_iana(output_path: Path, zip_url: str, private_src: Path) -> None:
     temp_dir = Path(tempfile.mkdtemp())
     try:
         _download_zip(zip_url, temp_dir)
         ipv4_dir = _find_dir(temp_dir, "TXT/IPV4")
         ipv6_dir = _find_dir(temp_dir, "TXT/IPV6")
-        builder = BinBuilder()
-        load_txt_dirs(builder, [ipv4_dir, ipv6_dir])
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        builder.save(str(output_path))
+        _run_build_geoip(
+            private_src,
+            "--ipv4-dir",
+            str(ipv4_dir),
+            "--ipv6-dir",
+            str(ipv6_dir),
+            "--output-dat",
+            str(output_path),
+        )
     finally:
         shutil.rmtree(temp_dir)
 
@@ -92,10 +119,11 @@ def main() -> None:
     parser.add_argument("--out-geoip", required=True, help="Output bgp-geoip.dat path")
     parser.add_argument("--out-iana", required=True, help="Output iana-geoip.dat path")
     args = parser.parse_args()
+    private_src = _resolve_private_src()
 
-    _build_cn(Path(args.out_cn), args.cn_url)
-    _build_geoip_text(Path(args.out_geoip), args.geoip_zip_url)
-    _build_iana(Path(args.out_iana), args.iana_zip_url)
+    _build_cn(Path(args.out_cn), args.cn_url, private_src)
+    _build_geoip_text(Path(args.out_geoip), args.geoip_zip_url, private_src)
+    _build_iana(Path(args.out_iana), args.iana_zip_url, private_src)
 
 
 if __name__ == "__main__":

@@ -55,11 +55,11 @@ python example.py
 Public facade verification:
 
 ```bash
-PYTHONPATH=<private-src> python -m unittest discover tests
+python -m unittest discover tests
 ```
 
 ## Notes
 
 - Country codes are returned as u16 in Rust and converted to 2-letter strings in Python.
 - `*_packed` methods are the high-throughput APIs for packed inputs (stride 4/16).
-- Wheel repack injects the public `__init__.py` and `ip_searcher.py` into the final package.
+- The public Python facade lives in `poptrie/__init__.py` and `poptrie/ip_searcher.py`.
