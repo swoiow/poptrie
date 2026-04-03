@@ -36,6 +36,7 @@ jobs:
       PYTHONUTF8: "1"
       PRIVATE_SRC_REPO_SLUG: ${{ inputs.private_src_repo_slug || vars.POPTRIE_PRIVATE_REPO_SLUG }}
       PRIVATE_SRC_REF: ${{ inputs.private_src_ref || 'main' }}
+      DIST_DIR: ${{ github.workspace }}/dist
 
     steps:
       - name: Checkout public repo
@@ -82,21 +83,27 @@ jobs:
         env:
           POPTRIE_PRIVATE_SRC: ${{ github.workspace }}/private-src
         run: |
-          mkdir -p dist
+          mkdir -p "$DIST_DIR"
           $PYTHON_EXEC .github/scripts/build_cn_bin.py \
             --cn-url "https://github.com/Loyalsoldier/geoip/raw/refs/heads/release/text/cn.txt" \
             --geoip-zip-url "https://github.com/Loyalsoldier/geoip/archive/refs/heads/release.zip" \
             --iana-zip-url "https://github.com/HotCakeX/Official-IANA-IP-blocks/archive/refs/heads/main.zip" \
-            --out-cn dist/geo-cn.dat \
-            --out-geoip dist/bgp-geoip.dat \
-            --out-iana dist/iana-geoip.dat
+            --out-cn "$DIST_DIR/geo-cn.dat" \
+            --out-geoip "$DIST_DIR/bgp-geoip.dat" \
+            --out-iana "$DIST_DIR/iana-geoip.dat"
+
+      - name: Verify data artifacts
+        run: |
+          test -f "$DIST_DIR/geo-cn.dat"
+          test -f "$DIST_DIR/bgp-geoip.dat"
+          test -f "$DIST_DIR/iana-geoip.dat"
 
       - name: Upload data artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: data-artifacts
           path: |
-            dist/geo-cn.dat
-            dist/bgp-geoip.dat
-            dist/iana-geoip.dat
+            ${{ env.DIST_DIR }}/geo-cn.dat
+            ${{ env.DIST_DIR }}/bgp-geoip.dat
+            ${{ env.DIST_DIR }}/iana-geoip.dat
           retention-days: 3
