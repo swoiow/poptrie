@@ -88,19 +88,14 @@ jobs:
           fi
 
       - name: Install build deps
-        run: $PYTHON_EXEC -m pip install --upgrade pip maturin wheel
+        run: $PYTHON_EXEC -m pip install --upgrade pip maturin setuptools wheel
 
       - name: Install auditwheel (Linux)
         if: runner.os == 'Linux'
         run: $PYTHON_EXEC -m pip install --upgrade auditwheel
 
       - name: Build wheels
-        run: |
-          if [ "$RUNNER_OS" = "Linux" ]; then
-            $PYTHON_EXEC -m maturin build --release --out "$GITHUB_WORKSPACE/dist" --auditwheel repair
-          else
-            $PYTHON_EXEC -m maturin build --release --out "$GITHUB_WORKSPACE/dist"
-          fi
+        run: $PYTHON_EXEC -m maturin build --release --out "$GITHUB_WORKSPACE/dist"
         working-directory: ${{ github.workspace }}/private-src
 
       - name: Repack wheels

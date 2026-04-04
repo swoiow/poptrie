@@ -3,36 +3,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
-
-PACKAGE_NAME = "poptrie"
-SUMMARY = "High-performance IP and country lookup backed by Rust poptrie"
-AUTHOR = "HarmonSir"
-AUTHOR_EMAIL = "git@pylab.me"
-LICENSE = "Apache-2.0"
-URL = "https://github.com/swoiow/poptrie"
-PROJECT_URLS = {
-    "Source": "https://github.com/swoiow/poptrie",
-    "Issues": "https://github.com/swoiow/poptrie/issues",
-    "Releases": "https://github.com/swoiow/poptrie/releases",
-}
-CLASSIFIERS = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
-    "Operating System :: MacOS",
-    "Operating System :: Microsoft :: Windows",
-    "Operating System :: POSIX :: Linux",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
-    "Programming Language :: Rust",
-    "Topic :: Internet",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-    "Typing :: Typed",
-]
 
 
 def _read_version(cargo_toml: Path) -> str:
@@ -42,22 +14,11 @@ def _read_version(cargo_toml: Path) -> str:
     raise SystemExit("Version not found in Cargo.toml")
 
 
-def _render_metadata(version: str, readme_text: str) -> str:
-    header_lines = [
-        "Metadata-Version: 2.1",
-        f"Name: {PACKAGE_NAME}",
-        f"Version: {version}",
-        f"Summary: {SUMMARY}",
-        f"Home-page: {URL}",
-        f"Author: {AUTHOR}",
-        f"Author-email: {AUTHOR_EMAIL}",
-        f"License: {LICENSE}",
-        "Requires-Python: >=3.8",
-        "Description-Content-Type: text/markdown",
-    ]
-    header_lines.extend(f"Project-URL: {label}, {url}" for label, url in PROJECT_URLS.items())
-    header_lines.extend(f"Classifier: {classifier}" for classifier in CLASSIFIERS)
-    return "\n".join(header_lines) + "\n\n" + readme_text.rstrip() + "\n"
+def _load_setup_template(template_path: Path, version: str) -> str:
+    template = template_path.read_text(encoding="utf-8")
+    if "__VERSION__" not in template:
+        raise SystemExit("setup.py template missing __VERSION__ placeholder")
+    return template.replace("__VERSION__", version)
 
 
 def main() -> None:
@@ -68,6 +29,7 @@ def main() -> None:
     package_src = repo_root / "poptrie"
     readme_src = repo_root / "README.md"
     license_src = repo_root / "LICENSE"
+    setup_template = repo_root / ".github" / "scripts" / "setup.py"
 
     if not cargo_toml.exists():
         raise SystemExit("Cargo.toml not found")
@@ -77,9 +39,11 @@ def main() -> None:
         raise SystemExit("README.md not found")
     if not license_src.exists():
         raise SystemExit("LICENSE not found")
+    if not setup_template.exists():
+        raise SystemExit("setup.py template not found")
 
     public_version = _read_version(cargo_toml)
-    readme_text = readme_src.read_text(encoding="utf-8")
+    setup_py = _load_setup_template(setup_template, public_version)
 
     wheels = sorted(dist_dir.glob("*.whl"))
     if not wheels:
@@ -88,64 +52,65 @@ def main() -> None:
     for wheel in wheels:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             temp_dir = Path(temp_dir_name)
-            unpack_dir = temp_dir / "unpacked"
-            repacked_dir = temp_dir / "repacked"
-            unpack_dir.mkdir()
-            repacked_dir.mkdir()
+            source_extract_dir = temp_dir / "source"
+            assembly_dir = temp_dir / "assembly"
+            source_extract_dir.mkdir()
+            assembly_dir.mkdir()
 
-            subprocess.run(
-                [sys.executable, "-m", "wheel", "unpack", str(wheel), "--dest", str(unpack_dir)],
-                check=True,
-            )
+            with zipfile.ZipFile(wheel, "r") as archive:
+                archive.extractall(source_extract_dir)
 
-            unpacked_items = [path for path in unpack_dir.iterdir() if path.is_dir()]
-            if len(unpacked_items) != 1:
-                raise SystemExit(f"Expected one unpacked wheel directory for {wheel.name}")
-
-            wheel_root = unpacked_items[0]
-            package_dir = wheel_root / "poptrie"
-            if not package_dir.exists():
-                raise SystemExit(f"poptrie package not found in {wheel.name}")
-            dist_info_dirs = sorted(wheel_root.glob("*.dist-info"))
-            if len(dist_info_dirs) != 1:
-                raise SystemExit(f"Expected one dist-info directory for {wheel.name}")
-            dist_info_dir = dist_info_dirs[0]
-            public_dist_info_dir = wheel_root / f"{PACKAGE_NAME}-{public_version}.dist-info"
+            package_dir = assembly_dir / "poptrie"
+            shutil.copytree(package_src, package_dir, dirs_exist_ok=True)
 
             suffixes = (".so", ".pyd", ".dll", ".dylib")
-            for ext_file in wheel_root.iterdir():
+            native_files = []
+            for ext_file in source_extract_dir.rglob("*"):
                 if ext_file.is_file() and ext_file.name.startswith("_native") and ext_file.suffix in suffixes:
-                    target = package_dir / ext_file.name
-                    if not target.exists():
-                        shutil.move(str(ext_file), str(target))
+                    native_files.append(ext_file)
+            if not native_files:
+                raise SystemExit(f"native module not found in {wheel.name}")
+            for native_file in native_files:
+                shutil.copy2(native_file, package_dir / native_file.name)
 
-            for source_path in package_src.iterdir():
-                if source_path.is_file() and source_path.suffix == ".py":
-                    shutil.copy2(source_path, package_dir / source_path.name)
-
-            shutil.copy2(readme_src, wheel_root / "README.md")
-            shutil.copy2(license_src, wheel_root / "LICENSE")
-            (dist_info_dir / "METADATA").write_text(
-                _render_metadata(public_version, readme_text),
-                encoding="utf-8",
-            )
-            if dist_info_dir != public_dist_info_dir:
-                dist_info_dir.rename(public_dist_info_dir)
+            shutil.copy2(readme_src, assembly_dir / "README.md")
+            shutil.copy2(license_src, assembly_dir / "LICENSE")
+            (assembly_dir / "setup.py").write_text(setup_py, encoding="utf-8")
 
             wheel.unlink()
             subprocess.run(
-                [sys.executable, "-m", "wheel", "pack", str(wheel_root), "--dest-dir", str(repacked_dir)],
+                [sys.executable, "setup.py", "bdist_wheel", "--py-limited-api=cp38"],
+                cwd=assembly_dir,
                 check=True,
             )
 
-            built_wheels = sorted(repacked_dir.glob("*.whl"))
-            if len(built_wheels) != 1:
-                raise SystemExit(f"Expected one repacked wheel for {wheel.name}")
-
-            built_wheel = built_wheels[0]
-            if public_version not in built_wheel.name:
-                raise SystemExit(f"Repacked wheel version mismatch for {wheel.name}")
-            shutil.copy2(built_wheel, dist_dir / built_wheel.name)
+            built_wheels = sorted((assembly_dir / "dist").glob("*.whl"))
+            if not built_wheels:
+                raise SystemExit("bdist_wheel did not produce a wheel")
+            if sys.platform.startswith("linux"):
+                wheelhouse = assembly_dir / "wheelhouse"
+                wheelhouse.mkdir(exist_ok=True)
+                for built_wheel in built_wheels:
+                    subprocess.run(
+                        [
+                            sys.executable,
+                            "-m",
+                            "auditwheel",
+                            "repair",
+                            str(built_wheel),
+                            "-w",
+                            str(wheelhouse),
+                        ],
+                        cwd=assembly_dir,
+                        check=True,
+                    )
+                built_wheels = sorted(wheelhouse.glob("*.whl"))
+                if not built_wheels:
+                    raise SystemExit("auditwheel did not produce a wheel")
+            for built_wheel in built_wheels:
+                if public_version not in built_wheel.name:
+                    raise SystemExit(f"Repacked wheel version mismatch for {wheel.name}")
+                shutil.copy2(built_wheel, dist_dir / built_wheel.name)
 
 
 if __name__ == "__main__":
