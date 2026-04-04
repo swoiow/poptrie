@@ -60,6 +60,7 @@ python -m unittest discover tests
 
 ## 说明
 
-- Rust 返回 u16 国家码，Python 负责转换为 2 位字符串。
-- `*_packed` 适合高吞吐场景，使用 4/16 字节步长扁平化字节流。
+- 国家查询由 Rust 层完成，Python 层以 2 位国家字符串形式返回。
+- `*_packed` 方法适用于高吞吐的字节流处理场景。
 - 公开 Python facade 位于 `poptrie/__init__.py` 和 `poptrie/ip_searcher.py`。
+- `*-overlap.csv` 这类文件是输入数据冲突审计报告，不代表最终导出的 `.dat` 文件仍然存在重叠 CIDR。

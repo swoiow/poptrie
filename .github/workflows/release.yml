@@ -129,6 +129,13 @@ jobs:
         with:
           tag_name: latest
           name: latest
+          body: |
+            ## Overlap Report Note
+
+            Files such as `*-overlap.csv` are input conflict audit reports.
+            They record overlaps found in the source geoip datasets before hole-punching and conflict resolution.
+            They do **not** mean the final exported `.dat` files still contain overlapping CIDRs.
+
           generate_release_notes: true
           fail_on_unmatched_files: false
           files: |
@@ -159,6 +166,13 @@ jobs:
         with:
           tag_name: ${{ env.CRON_TAG }}
           name: ${{ env.CRON_TAG }}
+          body: |
+            ## Overlap Report Note
+
+            Files such as `*-overlap.csv` are input conflict audit reports.
+            They record overlaps found in the source geoip datasets before hole-punching and conflict resolution.
+            They do **not** mean the final exported `.dat` files still contain overlapping CIDRs.
+
           fail_on_unmatched_files: false
           files: |
             dist/geo-cn.dat
