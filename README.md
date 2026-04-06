@@ -1,5 +1,9 @@
 # poptrie
 
+| staging | cron | production |
+| --- | --- | --- |
+| [![Release](https://github.com/swoiow/poptrie/actions/workflows/release.yml/badge.svg)](https://github.com/swoiow/poptrie/actions/workflows/release.yml) | [![Release: Cron](https://github.com/swoiow/poptrie/actions/workflows/release.yml/badge.svg?event=schedule)](https://github.com/swoiow/poptrie/actions/workflows/release.yml) | [![Prod-Publish PyPI](https://github.com/swoiow/poptrie/actions/workflows/publish-pypi.yml/badge.svg)](https://github.com/swoiow/poptrie/actions/workflows/publish-pypi.yml) |
+
 High-performance IP lookup backed by Rust. This public repository owns the final Python facade and publishes wheels.
 
 Stable public contract:
