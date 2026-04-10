@@ -79,7 +79,7 @@ def main() -> None:
 
             wheel.unlink()
             subprocess.run(
-                [sys.executable, "setup.py", "bdist_wheel", "--py-limited-api=cp38"],
+                [sys.executable, "setup.py", "bdist_wheel", "--py-limited-api=cp310"],
                 cwd=assembly_dir,
                 check=True,
             )
