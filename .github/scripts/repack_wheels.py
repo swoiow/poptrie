@@ -22,6 +22,7 @@ def _load_setup_template(template_path: Path, version: str) -> str:
 
 
 def main() -> None:
+    python_exec = Path(os.environ.get("PYTHON_EXEC"))
     repo_root = Path(os.environ.get("GITHUB_WORKSPACE", Path.cwd())).resolve()
     private_root = Path(os.environ["POPTRIE_PRIVATE_SRC"]).resolve()
     dist_dir = repo_root / os.environ.get("POPTRIE_DIST_DIR", "dist")
@@ -79,7 +80,7 @@ def main() -> None:
 
             wheel.unlink()
             subprocess.run(
-                [sys.executable, "setup.py", "bdist_wheel", "--py-limited-api=cp310"],
+                [python_exec, "setup.py", "bdist_wheel", "--py-limited-api=cp310"],
                 cwd=assembly_dir,
                 check=True,
             )
@@ -93,7 +94,7 @@ def main() -> None:
                 for built_wheel in built_wheels:
                     subprocess.run(
                         [
-                            sys.executable,
+                            python_exec,
                             "-m",
                             "auditwheel",
                             "repair",

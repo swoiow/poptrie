@@ -88,18 +88,32 @@ jobs:
           fi
 
       - name: Install build deps
-        run: $PYTHON_EXEC -m pip install --upgrade pip maturin setuptools wheel cffi
+        run: |
+          $PYTHON_EXEC -m pip install --upgrade pip
+          $PYTHON_EXEC -m pip install --upgrade maturin setuptools wheel cffi
 
       - name: Install auditwheel (Linux)
         if: runner.os == 'Linux'
         run: $PYTHON_EXEC -m pip install --upgrade auditwheel
 
       - name: Build wheels
-        run: $PYTHON_EXEC -m maturin build --release --out "$GITHUB_WORKSPACE/dist" --interpreter "$PYTHON_EXEC"
+        run: |
+          $PYTHON_EXEC -m maturin build \
+            --release \
+            --interpreter "$PYTHON_EXEC" --features python \
+            --out "$GITHUB_WORKSPACE/dist"
         working-directory: ${{ github.workspace }}/private-src
+
+      - name: Debug venv
+        run: |
+          $PYTHON_EXEC -c "import sys; print(sys.executable)"
+          $PYTHON_EXEC -c "import setuptools; print(setuptools.__file__)"
 
       - name: Repack wheels
         run: |
+          echo "PYTHON_EXEC=$PYTHON_EXEC"
+          
+          PYTHON_EXEC=$PYTHON_EXEC \
           POPTRIE_PRIVATE_SRC="$GITHUB_WORKSPACE/private-src" \
           POPTRIE_DIST_DIR="dist" \
           $PYTHON_EXEC .github/scripts/repack_wheels.py
