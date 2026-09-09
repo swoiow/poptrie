@@ -181,3 +181,17 @@ jobs:
             dist/geo-cn-overlap.csv
             dist/bgp-geoip-overlap.csv
             dist/iana-geoip-overlap.csv
+
+      - name: Publish latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: latest
+          fail_on_unmatched_files: false
+          files: |
+            dist/geo-cn.dat
+            dist/bgp-geoip.dat
+            dist/iana-geoip.dat
+            dist/geo-cn-overlap.csv
+            dist/bgp-geoip-overlap.csv
+            dist/iana-geoip-overlap.csv
