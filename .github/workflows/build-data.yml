@@ -40,10 +40,10 @@ jobs:
 
     steps:
       - name: Checkout public repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Checkout private repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ env.PRIVATE_SRC_REPO_SLUG }}
           token: ${{ secrets.poptrie_private_repo_token || secrets.GH_POPTRIE_TOKEN }}
@@ -51,7 +51,7 @@ jobs:
           path: private-src
 
       - name: Set up Python 3.14
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.14"
 
@@ -59,7 +59,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Cargo
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/bin/

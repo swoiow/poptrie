@@ -38,7 +38,7 @@ jobs:
     if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.release_mode == 'cron')
     steps:
       - name: Cleanup old cron releases
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const releases = await github.paginate(github.rest.repos.listReleases, {
@@ -86,7 +86,7 @@ jobs:
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release_mode == 'latest')
     steps:
       - name: Remove latest release
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             try {
@@ -125,7 +125,7 @@ jobs:
           path: dist
 
       - name: Publish latest release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: latest
           name: latest
@@ -162,7 +162,7 @@ jobs:
         run: echo "CRON_TAG=cron-$(date -u +%Y%m%d)" >> $GITHUB_ENV
 
       - name: Publish cron release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.CRON_TAG }}
           name: ${{ env.CRON_TAG }}
@@ -183,7 +183,7 @@ jobs:
             dist/iana-geoip-overlap.csv
 
       - name: Publish latest release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: latest
           name: latest
